@@ -1,0 +1,127 @@
+---
+title: "bigcon_modeling"
+author: "Hyeonho Lee"
+date: "2018년 8월 31일"
+output: 
+  pdf_document: 
+  latex_engine: xelatex
+html_document: default
+word_document:
+  highlight: tango
+mainfont: NanumGothic
+header-includes :
+  - \usepackage{kotex}
+---
+
+```{r include=F}
+knitr::opts_chunk$set(message=F,warning=F)
+```
+
+
+라이브러리
+```{r}
+library(dplyr)
+library(boot)
+library(caret)
+library(leaps)
+```
+
+
+```{r}
+dat = read.csv('C:/workspace/Github/big_contest/data/final/dat.csv', stringsAsFactors = F)
+
+dat_score = dat %>% group_by(감독) %>% mutate(감독점수 = mean(전국관객수))
+dat_score = dat_score %>% group_by(제작사) %>% mutate(제작사점수 = mean(전국관객수))
+dat_score = dat_score %>% group_by(수입사) %>% mutate(수입사점수 = mean(전국관객수))
+dat_score = dat_score %>% group_by(배우1) %>% mutate(배우1점수 = mean(전국관객수))
+dat_score = dat_score %>% group_by(배우2) %>% mutate(배우2점수 = mean(전국관객수))
+dat_score = dat_score %>% group_by(배우3) %>% mutate(배우3점수 = mean(전국관객수))
+
+#dat_score %>% group_by(장르) %>% summarise(mean = mean(전국관객수), n = n()) %>% arrange(desc(mean))
+
+dat_score$국적[dat_score$국적 != '한국' & dat_score$국적 != '미국'] = '3국'
+dat_score$개봉월[dat_score$개봉월 == 7 | dat_score$개봉월 == 8 | dat_score$개봉월 == 12 | dat_score$개봉월 == 1] = 'good'
+dat_score$개봉월[dat_score$개봉월 != 'good'] = 'bad'
+
+```
+
+```{r}
+dat_score_sel = dat_score %>% group_by() #%>% select(개봉월, 국적, 전국스크린수, 전국관객수,  
+                                        감독점수, 제작사점수, 배우1점수, 배우2점수, 배우3점수)
+
+
+dat_score_sel$개봉월 = as.factor(dat_score_sel$개봉월)
+dat_score_sel$국적 = as.factor(dat_score_sel$국적)
+
+```
+변수선택한번 해보자
+```{r}
+reg <- regsubsets(전국관객수 ~ ., data = dat_score_sel, nvmax = ncol(dat_score_sel) - 1)
+reg.s <- summary(reg)
+```
+
+
+```{r}
+# ind = sample(1:nrow(dat_score_sel), floor(.75*nrow(dat_score_sel)), replace = F)
+
+# train = dat_score_sel[ind,]
+# test = dat_score_sel[-ind,]
+```
+
+교차 검증전의 모델링
+```{r}
+model = glm(전국관객수~., dat_score_sel, family = 'gaussian')
+summary(model)
+```
+
+boot패키지의 5-fold 실행
+```{r}
+# sqrt(cv.glm(dat_score_sel, model, K = 5)$delta[1])
+```
+
+
+위에꺼 잘안되서 그냥 내가 만듬
+```{r}
+Fold_index <- createFolds(1:nrow(dat_score_sel), k = 5)
+```
+
+k-fold이러면 될듯
+```{r}
+Out_of_Sample_MSE_sqrt <- c()
+for(k in 1:5){
+  Train <- dat_score_sel[-Fold_index[[k]],]
+  Test <- dat_score_sel[Fold_index[[k]],]
+
+  out <- glm(전국관객수 ~ ., data = Train, family = 'gaussian')
+  test_pred <- predict(out, Test)
+  Out_of_Sample_MSE_sqrt[k] <- sqrt(mean( (Test$전국관객수 - test_pred)^2 ))
+}
+Out_of_Sample_MSE_sqrt
+mean(Out_of_Sample_MSE_sqrt)
+
+summary(out)
+```
+
+stepwise both 1회로 변수선택
+```{r}
+Fold_index <- createFolds(1:nrow(dat_score_sel), k = 5)
+
+Train <- dat_score_sel[-Fold_index[[1]],]
+Test <- dat_score_sel[Fold_index[[1]],]
+
+out <- glm(전국관객수 ~ 개봉월 + 국적 + 전국스크린수 + 등급 + 별점 + 감독점수 + 제작사점수 + 수입사점수 + 배우1점수 + 
+    배우2점수 + 배우3점수, data = Train, family = 'gaussian')
+out = step(out, direction = 'both')
+
+test_pred <- predict(out, Test)
+sqrt(mean( (Test$전국관객수 - test_pred)^2 ))
+```
+
+
+
+
+
+
+
+
+

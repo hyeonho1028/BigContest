@@ -1,0 +1,50 @@
+---
+title: "big_contest"
+author: "Hyeonho Lee"
+date: "2018년 8월 29일"
+output: 
+  pdf_document: 
+  latex_engine: xelatex
+html_document: default
+word_document:
+  highlight: tango
+mainfont: NanumGothic
+header-includes :
+  - \usepackage{kotex}
+---
+
+```{r}
+dat = read.csv('C:/workspace/Github/big_contest/data/dat.csv', stringsAsFactors = FALSE)
+
+dat = dat %>% filter(국적 == '한국' | 국적 == '미국' | 국적 == '영국')
+
+
+dat_score = dat %>% group_by(배급사) %>% mutate(배급사점수 = mean(전국관객수))
+dat_score = dat_score %>% group_by(감독) %>% mutate(감독점수 = mean(전국관객수))
+dat_score = dat_score %>% group_by(제작사) %>% mutate(제작사점수 = mean(전국관객수))
+dat_score = dat_score %>% group_by(수입사) %>% mutate(수입사점수 = mean(전국관객수))
+
+
+dat_score = dat_score[,-c(1:6)]
+
+```
+
+```{r}
+ind = sample(nrow(dat_score), floor(.75*nrow(dat_score)), replace = F)
+
+train <- dat_score[ind,]
+test <- dat_score[-ind,]
+
+
+summary(model)
+model = glm(전국관객수~., train, family = poisson)
+
+
+
+pred = predict(model, test)
+sqrt(mean((train$전국관객수-pred)**2))
+
+```
+
+
+
